@@ -2,6 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>StageZero.TableHelper</PackageId>
+    <Version>1.0.1</Version>
+    <Authors>StageZero Technologies</Authors>
+    <Description>ASP.NET Core HTML helper for creating tables with search, sort and pagination.</Description>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
 
 </Project>
