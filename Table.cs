@@ -29,13 +29,15 @@ namespace StageZero.TableHelper
 
             public string Name { get; set; }
 
-            public Expression<Func<TItem, object>> DisplayExpression { get; set; }
+            public Func<TItem, object> DisplayExpression { get; set; }
 
             public Expression<Func<TItem, object>> SortExpression { get; set; }
 
             public Expression<Func<TItem, bool>> SearchExpression { get; set; }
 
             public IList<ColumnSetting> ColumnSettings { get; set; }
+
+            public Func<TItem, object> CellAttributesFunction = null;
         }
 
         IQueryable<TItem> Items { get; set; }
@@ -120,6 +122,11 @@ namespace StageZero.TableHelper
         /// </summary>
         public string SearchClearText = "×";
 
+        /// <summary>
+        /// Gives the row attributes based on the item
+        /// </summary>
+        public Func<TItem, object> RowAttributesFunction = null;
+
         internal Table(IHtmlHelper htmlHelper, IQueryable<TItem> items, string id, object htmlAttributes)
         {
             HtmlHelper = htmlHelper;
@@ -147,10 +154,10 @@ namespace StageZero.TableHelper
         /// <param name="displayExpression">Expression by which to render text to display in column cell</param>
         /// <param name="columnSettings">Special settings for column</param>
         public void AddCol(string columnName,
-            Expression<Func<TItem, object>> displayExpression,
+            Func<TItem, object> displayExpression,
             params ColumnSetting[] columnSettings)
         {
-            AddCol(columnName, displayExpression, null, null, columnSettings);
+            AddCol(columnName, displayExpression, null, null, null, columnSettings);
         }
 
         /// <summary>
@@ -161,11 +168,26 @@ namespace StageZero.TableHelper
         /// <param name="searchExpression">Expression by which to perform search on column. Use <see cref="SearchTerm"/> as the search term.</param>
         /// <param name="columnSettings">Special settings for column</param>
         public void AddCol(string columnName,
-            Expression<Func<TItem, object>> displayExpression,
+            Func<TItem, object> displayExpression,
             Expression<Func<TItem, bool>> searchExpression,
             params ColumnSetting[] columnSettings)
         {
-            AddCol(columnName, displayExpression, null, searchExpression, columnSettings);
+            AddCol(columnName, displayExpression, null, searchExpression, null, columnSettings);
+        }
+
+        /// <summary>
+        /// Add a column to the table.
+        /// </summary>
+        /// <param name="columnName">Name of the column</param>
+        /// <param name="displayExpression">Expression by which to render text to display in column cell</param>
+        /// <param name="sortExpression">Expression by which to sort the column.</param>
+        /// <param name="columnSettings">Special settings for column</param>
+        public void AddCol(string columnName,
+            Func<TItem, object> displayExpression,
+            Expression<Func<TItem, object>> sortExpression,
+            params ColumnSetting[] columnSettings)
+        {
+            AddCol(columnName, displayExpression, sortExpression, null, null, columnSettings);
         }
 
         /// <summary>
@@ -175,11 +197,13 @@ namespace StageZero.TableHelper
         /// <param name="displayExpression">Expression by which to render text to display in column cell</param>
         /// <param name="sortExpression">Expression by which to sort the column.</param>
         /// <param name="searchExpression">Expression by which to perform search on column. Use <see cref="SearchTerm"/> as the search term.</param>
+        /// <param name="cellAttributesFunction">Gives the cell attributes based on the item</param>
         /// <param name="columnSettings">Special settings for column</param>
         public void AddCol(string columnName,
-            Expression<Func<TItem, object>> displayExpression,
+            Func<TItem, object> displayExpression,
             Expression<Func<TItem, object>> sortExpression = null,
             Expression<Func<TItem, bool>> searchExpression = null,
+            Func<TItem, object> cellAttributesFunction = null,
             params ColumnSetting[] columnSettings)
         {
             var colSetting = new Column
@@ -189,6 +213,7 @@ namespace StageZero.TableHelper
                 DisplayExpression = displayExpression,
                 SortExpression = sortExpression,
                 SearchExpression = searchExpression,
+                CellAttributesFunction = cellAttributesFunction,
                 ColumnSettings = columnSettings.ToList()
             };
 
@@ -227,9 +252,24 @@ namespace StageZero.TableHelper
             {
                 var rowBuilder = new TagBuilder("tr");
 
+                if (RowAttributesFunction != null)
+                    rowBuilder.MergeAttributes(new RouteValueDictionary(RowAttributesFunction(item)));
+
                 foreach (var col in Columns)
                 {
-                    rowBuilder.InnerHtml.AppendHtml($"<td>{col.DisplayExpression.Compile()(item)}</td>");
+                    var cellBuilder = new TagBuilder("td");
+
+                    if (col.CellAttributesFunction != null)
+                        cellBuilder.MergeAttributes(new RouteValueDictionary(col.CellAttributesFunction(item)));
+
+                    var display = col.DisplayExpression(item);
+
+                    if (display is IHtmlContent content)
+                        cellBuilder.InnerHtml.AppendHtml(content);
+                    else
+                        cellBuilder.InnerHtml.Append(display != null ? display.ToString() : String.Empty);
+
+                    rowBuilder.InnerHtml.AppendHtml(cellBuilder);
                 }
 
                 bodyBuilder.InnerHtml.AppendHtml(rowBuilder);
